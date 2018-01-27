@@ -57,7 +57,7 @@ print("channel = " + str(channel))
 sound = mixer.LoadSound("assets/audio/tone.wav")
 params = hg.MixerChannelState()
 params.loop_mode = hg.MixerRepeat
-params.volume = 1.0
+params.volume = 0.0
 tone_channel = mixer.Start(sound, params)
 print("tone_channel = " + str(tone_channel))
 
@@ -177,13 +177,12 @@ def emit_controller():
 
 
 def update_tone_sound(dt):
-	global shooting
+	global shooting, tone_channel
+	vol = max(0.0, mixer.GetChannelState(tone_channel).volume - 15.0 * hg.time_to_sec_f(dt))
 	if shooting:
-		vol = min(1.0, mixer.GetChannelState(tone_channel).volume + 3.0 * hg.time_to_sec_f(dt))
-	else:
-		vol = max(0.0, mixer.GetChannelState(tone_channel).volume - 3.0 * hg.time_to_sec_f(dt))
+		vol = min(1.0, mixer.GetChannelState(tone_channel).volume + 10.0 * hg.time_to_sec_f(dt))
 
-	mixer.SetChannelState(tone_channel, hg.MixerChannelState(vol))
+	mixer.SetChannelState(tone_channel, hg.MixerChannelState(0, vol * 0.5, hg.MixerRepeat))
 
 
 # Main loop
@@ -207,7 +206,7 @@ while not plus.IsAppEnded():
 		mat_head = mat4()
 
 	# emitter_angle += -hg.time_to_sec_f(dt) * 0.5
-	emitter_angle = mat_head.GetRotation().y # + (2 * math.pi / 3.0)
+	emitter_angle = mat_head.GetRotation().y + (current_tower * 2 * math.pi / 3.0)
 	emitter_pos = hg.Vector3(emitter_distance * math.sin(emitter_angle), 0, emitter_distance * math.cos(emitter_angle))
 	# print(emitter_angle)
 	plus.Text2D(16, 16, "emitter_angle = " + str(math.radians(emitter_angle)))
