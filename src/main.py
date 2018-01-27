@@ -5,10 +5,27 @@ import harfang as hg
 import time
 import math
 
+vec3 = hg.Vector3
+mat3 = hg.Matrix3
+mat4 = hg.Matrix4
+col = hg.Color
+
 hg.LoadPlugins()
 
 plus = hg.GetPlus()
 plus.RenderInit(512, 256)
+
+openvr_frame_renderer = hg.GetFrameRenderer("VR")
+if openvr_frame_renderer.Initialize(plus.GetRenderSystem()):
+	print("!! Use VR")
+else:
+	openvr_frame_renderer = None
+	exit()
+	print("!! No VR detected")
+
+
+input_system = hg.GetInputSystem()
+head_controller = input_system.GetDevice("HMD")
 
 # mount the system file driver
 hg.MountFileDriver(hg.StdFileDriver())
@@ -30,13 +47,19 @@ params.loop_mode = hg.MixerRepeat
 channel = mixer.Start(sound, params)
 
 emitter_distance = 10 # in meters
-emitter_pos_phase = 0.0
+emitter_angle = 0.0
+referentiel_pos=hg.Vector3(0, 0, 0)
 
 while not plus.IsAppEnded():
 	dt = hg.GetLastFrameDuration()
 
-	emitter_pos_phase += -hg.time_to_sec_f(dt) * 0.5
-	emitter_pos = hg.Vector3(emitter_distance * math.sin(emitter_pos_phase), 0, emitter_distance * math.cos(emitter_distance))
+	if head_controller is not None:
+		mat_head = head_controller.GetMatrix(hg.InputDeviceMatrixHead)
+
+	# emitter_angle += -hg.time_to_sec_f(dt) * 0.5
+	emitter_angle = mat_head.GetRotation().y
+	emitter_pos = hg.Vector3(emitter_distance * math.sin(emitter_angle), 0, emitter_distance * math.cos(emitter_angle))
+	print(emitter_angle)
 
 	mixer.SetChannelLocation(channel, hg.MixerChannelLocation(emitter_pos))
 
