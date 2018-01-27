@@ -6,7 +6,7 @@ import time
 import math
 import random
 
-enable_vr = True
+enable_vr = False
 
 vec3 = hg.Vector3
 mat3 = hg.Matrix3
@@ -33,6 +33,10 @@ hg.MountFileDriver(hg.StdFileDriver())
 scene = plus.NewScene()
 cam = plus.AddCamera(scene)
 
+plus.AddLight(scene, hg.Matrix4.TranslationMatrix(hg.Vector3(0, 20, -7)), hg.LightModelPoint)
+# plus.AddSphere(scene, hg.Matrix4.TranslationMatrix(hg.Vector3(0, 0.5, -10)))
+# plus.AddPhysicPlane(scene, hg.Matrix4.TranslationMatrix(hg.Vector3(0, -2, 0)))
+
 # create a new sound mixer
 mixer = hg.CreateMixer()
 mixer.Open()
@@ -42,13 +46,14 @@ mixer.EnableSpatialization(True)
 sound = mixer.LoadSound("assets/audio/modem_talking.ogg")
 params = hg.MixerChannelState()
 params.loop_mode = hg.MixerRepeat
+params.volume = 0.15
 
 # play the sound
 channel = mixer.Start(sound, params)
 
 emitter_distance = 10 # in meters
 emitter_angle = 0.0
-referentiel_pos=hg.Vector3(0, 0, 0)
+referentiel_pos = hg.Vector3(0, 0, 0)
 
 timer = 0.0
 current_tower = 0
@@ -57,6 +62,8 @@ dispatch = None
 word_list = []
 current_word = 0
 game_state = "waiting"
+emitter_pos = vec3(0,0,0)
+tower_target = -1
 
 
 def wait_player_start():
@@ -74,20 +81,26 @@ def tower_announce():
 
 	word_list = []
 	word_list.append("hello_i_am_number_" + str(current_tower))
+	word_list.append("pause")
 	word_list.append("i_repeat")
+	word_list.append("tower")
 	word_list.append("number_" + str(current_tower))
+	word_list.append("pause")
+	word_list.append("pause")
+
 	current_word = 0
 
 	dispatch = unroll_word_list
 
 
 def unroll_word_list():
-	global dispatch, channel_tower, mixer, current_word, game_state, word_list
+	global dispatch, channel_tower, mixer, current_word, game_state, word_list, emitter_pos
 
 	if channel_tower is None or mixer.GetPlayState(channel_tower) == hg.MixerStopped:
 		if current_word < len(word_list):
 			new_sound = mixer.LoadSound("assets/audio/" + word_list[current_word] + ".wav")
-			channel_tower = mixer.Start(new_sound)
+			new_pos_params = hg.MixerChannelLocation(emitter_pos)
+			channel_tower = mixer.Start(new_sound, new_pos_params)
 			current_word += 1
 		else:
 			channel_tower = None
@@ -106,20 +119,38 @@ def speaking_is_over():
 
 
 def create_challenge():
-	global dispatch, timer, word_list, current_word
+	global dispatch, timer, word_list, current_word, tower_target
 	timer = 0.0
 	current_word = 0
 	a = int(random.uniform(0, 9))
 	b = int(random.uniform(0, 9))
+	tower_target = -1
+	while tower_target < 0 or tower_target == current_tower:
+		tower_target = int(random.uniform(0, 2))
+
 	sign = "number_plus"
 	if random.uniform(0, 100) > 50:
 		sign = "number_by"
 
 	word_list = []
+	word_list.append("pause")
+	word_list.append("this_is_the_transmission")
+	word_list.append("pause")
+	word_list.append("pause")
 	word_list.append("number_" + str(a))
 	word_list.append(sign)
 	word_list.append("number_" + str(b))
 	word_list.append("number_equals")
+	word_list.append("pause")
+	word_list.append("please_transmit_to")
+	word_list.append("tower")
+	word_list.append("number_" + str(tower_target))
+	word_list.append("pause")
+	word_list.append("i_repeat")
+	word_list.append("please_transmit_to")
+	word_list.append("tower")
+	word_list.append("number_" + str(tower_target))
+	word_list.append("pause")
 
 	dispatch = unroll_word_list
 
@@ -145,10 +176,10 @@ while not plus.IsAppEnded():
 		mat_head = mat4()
 
 	# emitter_angle += -hg.time_to_sec_f(dt) * 0.5
-	emitter_angle = mat_head.GetRotation().y
+	emitter_angle = mat_head.GetRotation().y # + (2 * math.pi / 3.0)
 	emitter_pos = hg.Vector3(emitter_distance * math.sin(emitter_angle), 0, emitter_distance * math.cos(emitter_angle))
 	# print(emitter_angle)
-	plus.Text2D(16, 16, "emitter_angle = " + str(emitter_angle))
+	plus.Text2D(16, 16, "emitter_angle = " + str(math.radians(emitter_angle)))
 	plus.Text2D(16, 32, "timer         = " + str(timer))
 	plus.Text2D(16, 48, "game_state    = " + game_state)
 	if len(word_list) > 0 and current_word < len(word_list):
@@ -156,11 +187,12 @@ while not plus.IsAppEnded():
 		plus.Text2D(16, 64 + 16, "next word = " + word_list[current_word])
 
 	mixer.SetChannelLocation(channel, hg.MixerChannelLocation(emitter_pos))
-	if channel_tower is not None:
-		mixer.SetChannelLocation(channel_tower, hg.MixerChannelLocation(emitter_pos))
 
 	if dispatch is not None:
 		dispatch()
+
+	if channel_tower is not None:
+		mixer.SetChannelLocation(channel_tower, hg.MixerChannelLocation(emitter_pos))
 
 	timer += hg.time_to_sec_f(dt)
 
