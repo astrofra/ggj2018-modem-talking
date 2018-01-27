@@ -6,7 +6,7 @@ import time
 import math
 import random
 
-enable_vr = False
+enable_vr = True
 
 vec3 = hg.Vector3
 mat3 = hg.Matrix3
