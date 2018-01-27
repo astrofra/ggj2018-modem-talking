@@ -30,6 +30,8 @@ if enable_vr:
 # mount the system file driver
 hg.MountFileDriver(hg.StdFileDriver())
 
+game_device = hg.GetInputSystem().GetDevice("xinput.port0")
+
 scene = plus.NewScene()
 cam = plus.AddCamera(scene)
 
@@ -42,14 +44,23 @@ mixer = hg.CreateMixer()
 mixer.Open()
 mixer.EnableSpatialization(True)
 
-# load a sound
+channel = None
+# load & play a bg sound
 sound = mixer.LoadSound("assets/audio/modem_talking.ogg")
 params = hg.MixerChannelState()
 params.loop_mode = hg.MixerRepeat
 params.volume = 0.15
-
-# play the sound
 channel = mixer.Start(sound, params)
+print("channel = " + str(channel))
+
+# load & play a tone sound
+sound = mixer.LoadSound("assets/audio/tone.wav")
+params = hg.MixerChannelState()
+params.loop_mode = hg.MixerRepeat
+params.volume = 1.0
+tone_channel = mixer.Start(sound, params)
+print("tone_channel = " + str(tone_channel))
+
 
 emitter_distance = 10 # in meters
 emitter_angle = 0.0
@@ -64,6 +75,7 @@ current_word = 0
 game_state = "waiting"
 emitter_pos = vec3(0,0,0)
 tower_target = -1
+shooting = False
 
 
 def wait_player_start():
@@ -101,6 +113,7 @@ def unroll_word_list():
 			new_sound = mixer.LoadSound("assets/audio/" + word_list[current_word] + ".wav")
 			new_pos_params = hg.MixerChannelLocation(emitter_pos)
 			channel_tower = mixer.Start(new_sound, new_pos_params)
+			print("channel_tower = " + str(channel_tower))
 			current_word += 1
 		else:
 			channel_tower = None
@@ -154,8 +167,26 @@ def create_challenge():
 
 	dispatch = unroll_word_list
 
-# Main loop
 
+def emit_controller():
+	global shooting, tone_channel
+	if not game_device.WasButtonPressed(hg.Button0) and game_device.IsButtonDown(hg.Button0):
+		shooting = True
+	else:
+		shooting = False
+
+
+def update_tone_sound(dt):
+	global shooting
+	if shooting:
+		vol = min(1.0, mixer.GetChannelState(tone_channel).volume + 3.0 * hg.time_to_sec_f(dt))
+	else:
+		vol = max(0.0, mixer.GetChannelState(tone_channel).volume - 3.0 * hg.time_to_sec_f(dt))
+
+	mixer.SetChannelState(tone_channel, hg.MixerChannelState(vol))
+
+
+# Main loop
 if enable_vr:
 	scene.GetRenderableSystem().SetFrameRenderer(openvr_frame_renderer)
 
@@ -182,17 +213,22 @@ while not plus.IsAppEnded():
 	plus.Text2D(16, 16, "emitter_angle = " + str(math.radians(emitter_angle)))
 	plus.Text2D(16, 32, "timer         = " + str(timer))
 	plus.Text2D(16, 48, "game_state    = " + game_state)
+	plus.Text2D(16, 64, "shooting      = " + str(shooting))
 	if len(word_list) > 0 and current_word < len(word_list):
-		plus.Text2D(16, 64, "current word = " + word_list[max(0, current_word - 1)])
-		plus.Text2D(16, 64 + 16, "next word = " + word_list[current_word])
+		plus.Text2D(16, 64 + 16, "current word = " + word_list[max(0, current_word - 1)])
+		plus.Text2D(16, 64 + 32, "next word = " + word_list[current_word])
 
-	mixer.SetChannelLocation(channel, hg.MixerChannelLocation(emitter_pos))
+	if channel is not None:
+		mixer.SetChannelLocation(channel, hg.MixerChannelLocation(emitter_pos))
 
 	if dispatch is not None:
 		dispatch()
 
 	if channel_tower is not None:
 		mixer.SetChannelLocation(channel_tower, hg.MixerChannelLocation(emitter_pos))
+
+	emit_controller()
+	update_tone_sound(dt)
 
 	timer += hg.time_to_sec_f(dt)
 
