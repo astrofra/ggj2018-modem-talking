@@ -23,10 +23,6 @@ else:
 	exit()
 	print("!! No VR detected")
 
-
-input_system = hg.GetInputSystem()
-head_controller = input_system.GetDevice("HMD")
-
 # mount the system file driver
 hg.MountFileDriver(hg.StdFileDriver())
 
@@ -50,8 +46,13 @@ emitter_distance = 10 # in meters
 emitter_angle = 0.0
 referentiel_pos=hg.Vector3(0, 0, 0)
 
+scene.GetRenderableSystem().SetFrameRenderer(openvr_frame_renderer)
+
 while not plus.IsAppEnded():
 	dt = hg.GetLastFrameDuration()
+
+	input_system = hg.GetInputSystem()
+	head_controller = input_system.GetDevice("HMD")	
 
 	if head_controller is not None:
 		mat_head = head_controller.GetMatrix(hg.InputDeviceMatrixHead)
